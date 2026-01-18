@@ -81,7 +81,7 @@ export default function Home() {
         <div className="h-full pt-16 lg:pt-0"> {/* Padding top on mobile for header */}
           {activeTab === 'inspector' ? (
             <StockSidebar
-              initialTickers={analysisParams?.tickers || ['AAPL', 'MSFT', 'SCHD', 'JEPI']}
+              initialTickers={analysisParams?.tickers || ['SPY', 'QQQ', 'SCHD', 'TLT', 'GLD']}
               selectedTicker={inspectorTicker}
               onSelectTicker={(t) => { setInspectorTicker(t); setIsMobileMenuOpen(false); }}
             />

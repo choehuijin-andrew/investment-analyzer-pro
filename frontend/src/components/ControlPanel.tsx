@@ -8,9 +8,9 @@ interface ControlPanelProps {
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({ onAnalyze, isLoading }) => {
-    const [tickersInput, setTickersInput] = useState('SPY, SCHD, TLT');
+    const [tickersInput, setTickersInput] = useState('SPY, QQQ, SCHD, TLT, GLD');
     const [startDate, setStartDate] = useState('2020-01-01');
-    const [endDate, setEndDate] = useState('2023-12-31');
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
     const handleAnalyze = () => {
         const tickers = tickersInput.split(',').map((t) => t.trim().toUpperCase()).filter(t => t);
