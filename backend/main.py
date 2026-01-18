@@ -6,13 +6,16 @@ import uvicorn
 import pandas as pd
 import yfinance as yf
 import analysis
+import os
 
 app = FastAPI(title="Investment Analyzer API")
 
 # CORS Setup (Allow Frontend)
+origins = ["http://localhost:3000", os.getenv("FRONTEND_URL")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, specify domain
+    allow_origins=[o for o in origins if o], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
