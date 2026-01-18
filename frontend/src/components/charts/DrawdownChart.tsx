@@ -1,0 +1,84 @@
+"use client";
+import React from 'react';
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer
+} from 'recharts';
+
+interface DrawdownChartProps {
+    data: any[];
+}
+
+const colors = [
+    "#10b981", // Emerald 500
+    "#3b82f6", // Blue 500
+    "#8b5cf6", // Violet 500
+    "#f59e0b", // Amber 500
+    "#ef4444", // Red 500
+];
+
+import ChartInfo from '../common/ChartInfo';
+
+const DrawdownChart: React.FC<DrawdownChartProps> = ({ data }) => {
+    if (!data || data.length === 0) return null;
+
+    const tickers = Object.keys(data[0]).filter(key => key !== 'date');
+
+    return (
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm h-[400px]">
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white">Underwater Plot (Drawdowns)</h3>
+                    <ChartInfo
+                        title="최대 낙폭 (Underwater Plot)"
+                        description="역대 최고점(High Water Mark) 대비 현재 자산 가치가 얼마나 하락했는지를 보여줍니다. 0%는 신고가를 의미하며, -20%는 고점 대비 20% 하락한 상태입니다. 하락장에서의 방어력과 회복 탄력성을 평가하는 중요 지표입니다."
+                    />
+                </div>
+                <span className="text-xs text-slate-500">Decline from historical peak over time</span>
+            </div>
+
+            <ResponsiveContainer width="100%" height="90%">
+                <AreaChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis
+                        dataKey="date"
+                        stroke="#94a3b8"
+                        fontSize={12}
+                        tickFormatter={(val) => val.slice(0, 4)}
+                        minTickGap={30}
+                    />
+                    <YAxis
+                        stroke="#94a3b8"
+                        fontSize={12}
+                        unit="%"
+                    />
+                    <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
+                        itemStyle={{ color: '#e2e8f0' }}
+                        formatter={(value: any) => [typeof value === 'number' ? `${value.toFixed(2)}%` : value, '']}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                    {tickers.map((ticker, index) => (
+                        <Area
+                            key={ticker}
+                            type="monotone"
+                            dataKey={ticker}
+                            stroke={colors[index % colors.length]}
+                            fill={colors[index % colors.length]}
+                            fillOpacity={0.1}
+                            strokeWidth={2}
+                        />
+                    ))}
+                </AreaChart>
+            </ResponsiveContainer>
+        </div>
+    );
+};
+
+export default DrawdownChart;
