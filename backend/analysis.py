@@ -764,3 +764,130 @@ def get_stock_details(ticker: str):
     except Exception as e:
         print(f"Detail Fetch Error {ticker}: {e}")
         return None
+
+def calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
+    """Calculates Relative Strength Index (RSI)."""
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).fillna(0)
+    loss = (-delta.where(delta < 0, 0)).fillna(0)
+    
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+    
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+def calculate_mfi(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, period: int = 14) -> pd.Series:
+    """Calculates Money Flow Index (MFI)."""
+    typical_price = (high + low + close) / 3
+    raw_money_flow = typical_price * volume
+    
+    tp_diff = typical_price.diff()
+    positive_flow = raw_money_flow.where(tp_diff > 0, 0)
+    negative_flow = raw_money_flow.where(tp_diff < 0, 0)
+    
+    positive_mf = positive_flow.rolling(window=period, min_periods=period).sum()
+    negative_mf = negative_flow.rolling(window=period, min_periods=period).sum()
+    
+    mfi_ratio = positive_mf / negative_mf
+    mfi = 100 - (100 / (1 + mfi_ratio))
+    return mfi
+
+def calculate_bollinger_bands(series: pd.Series, period: int = 20, std_dev: int = 2):
+    """Calculates Bollinger Bands (Middle, Upper, Lower)."""
+    middle = series.rolling(window=period).mean()
+    std = series.rolling(window=period).std()
+    upper = middle + (std * std_dev)
+    lower = middle - (std * std_dev)
+    return middle, upper, lower
+
+def get_technical_analysis(ticker: str, period="2y"):
+    """
+    Fetches history and calculates RSI, MFI, Bollinger Bands.
+    Returns current signals and timeseries.
+    period="2y" to ensure enough data for MAs/RSI.
+    """
+    try:
+        # Need Open/High/Low/Close/Volume
+        df = yf.download(ticker, period=period, interval="1d", progress=False, auto_adjust=False)
+        
+        # Flatten columns if multi-index (common in newer yfinance)
+        if isinstance(df.columns, pd.MultiIndex):
+            # If specifically ticker level
+            try:
+                # Iterate columns to check if Ticker is level 0
+                if ticker in df.columns.levels[0]:
+                    df = df.xs(ticker, axis=1, level=0, drop_level=True)
+                # else: assume flat or just use what is there
+            except:
+                pass
+                
+        # Column Check (Case insensitive or adjusting)
+        # yfinance columns: Open, High, Low, Close, Adj Close, Volume
+        
+        # Ensure we work with clean series
+        if 'Close' not in df.columns: return None
+        
+        close = df['Close']
+        high = df['High']
+        low = df['Low'] 
+        volume = df['Volume']
+        
+        # If series is empty
+        if close.empty: return None
+
+        # 1. Calculate Indicators
+        rsi = calculate_rsi(close)
+        mfi = calculate_mfi(high, low, close, volume)
+        bb_mid, bb_upper, bb_lower = calculate_bollinger_bands(close)
+        
+        # 2. Prepare Timeseries for Chart (Last 1 year is usually enough for display, but user wants '2y' context?)
+        # Let's return last 252 days usually.
+        
+        result_df = pd.DataFrame({
+            "date": df.index,
+            "price": close,
+            "rsi": rsi,
+            "mfi": mfi,
+            "bb_upper": bb_upper,
+            "bb_lower": bb_lower,
+            "bb_mid": bb_mid
+        }).dropna() # Drop initial NaNs from rolling
+        
+        # 3. Current Signal State (Latest)
+        if result_df.empty: return None
+        
+        latest = result_df.iloc[-1]
+        
+        signals = {
+            "current_price": round(latest['price'], 2),
+            "rsi": round(latest['rsi'], 2),
+            "mfi": round(latest['mfi'], 2),
+            "bb_lower": round(latest['bb_lower'], 2),
+            "bb_upper": round(latest['bb_upper'], 2),
+            "bb_position": round((latest['price'] - latest['bb_lower']) / (latest['bb_upper'] - latest['bb_lower']) * 100, 1), # % position in band
+            "date": latest['date'].strftime("%Y-%m-%d")
+        }
+        
+        # Format Timeseries
+        timeseries = []
+        for _, row in result_df.iterrows():
+            timeseries.append({
+                "date": row['date'].strftime("%Y-%m-%d"),
+                "price": round(row['price'], 2),
+                "rsi": round(row['rsi'], 2),
+                "mfi": round(row['mfi'], 2),
+                "bb_upper": round(row['bb_upper'], 2),
+                "bb_lower": round(row['bb_lower'], 2),
+                "bb_mid": round(row['bb_mid'], 2)
+            })
+            
+        return {
+            "summary": signals,
+            "timeseries": timeseries
+        }
+
+    except Exception as e:
+        print(f"Technical Analysis Error {ticker}: {e}")
+        return None

@@ -16,10 +16,10 @@ const EtfComparison: React.FC<EtfComparisonProps> = ({ availableTickers }) => {
         if (selected.includes(t)) {
             setSelected(selected.filter(x => x !== t));
         } else {
-            if (selected.length < 3) {
+            if (selected.length < 2) {
                 setSelected([...selected, t]);
             } else {
-                alert("Max 3 ETFs for comparison");
+                alert("Max 2 ETFs for comparison");
             }
         }
     };

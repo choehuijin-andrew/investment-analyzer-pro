@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, TrendingDown, DollarSign, Activity, PieChart, BarChart } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart as RechartsBarChart, Bar, Legend } from 'recharts';
 import ChartInfo from '../common/ChartInfo';
+import TimingTab from './TimingTab';
 
 // Mock components for now, will modularize later
 const MetricCard = ({ title, value, subtext, isPositive }: any) => (
@@ -29,7 +30,7 @@ interface StockDashboardProps {
 
 const StockDashboard: React.FC<StockDashboardProps> = ({ tickers, activeTicker }) => {
     // If activeTicker is provided, use it. Otherwise default to first ticker or AAPL.
-    const effectiveTicker = activeTicker || tickers[0] || 'AAPL';
+    const effectiveTicker = activeTicker || (tickers && tickers.length > 0 ? tickers[0] : 'AAPL');
 
     const [details, setDetails] = useState<any>(null);
     const [history, setHistory] = useState<any[]>([]);
@@ -140,7 +141,19 @@ const StockDashboard: React.FC<StockDashboardProps> = ({ tickers, activeTicker }
                                                     </linearGradient>
                                                 </defs>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
-                                                <XAxis dataKey="date" hide />
+                                                <XAxis
+                                                    dataKey="date"
+                                                    hide={false}
+                                                    tickFormatter={(val) => {
+                                                        // Simple format based on string length or basic parsing
+                                                        // Assuming val is ISO date or similar "YYYY-MM-DD"
+                                                        if (period === '1d' || period === '5d') return val.split(' ')[1] || val; // Time
+                                                        if (period === '1mo' || period === '6mo') return val.split('-').slice(1).join('/'); // MM/DD
+                                                        return val.split('-')[0]; // Year for long term
+                                                    }}
+                                                    minTickGap={50}
+                                                    tick={{ fontSize: 10, fill: '#64748b' }}
+                                                />
                                                 <YAxis domain={['auto', 'auto']} stroke="#64748b" tickFormatter={(v) => `$${v}`} tick={{ fontSize: 12 }} />
                                                 <Tooltip
                                                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
@@ -168,12 +181,17 @@ const StockDashboard: React.FC<StockDashboardProps> = ({ tickers, activeTicker }
                         </div>
 
                         {/* Tabs for Deep Dive */}
-                        <Tabs defaultValue="dividends" className="w-full mt-4">
-                            <TabsList className="bg-slate-900 border border-slate-800 text-slate-400 p-1 rounded-lg w-full justify-start h-auto">
+                        <Tabs defaultValue="timing" className="w-full mt-4">
+                            <TabsList className="bg-slate-900 border border-slate-800 text-slate-400 p-1 rounded-lg w-full justify-start h-auto overflow-x-auto">
+                                <TabsTrigger value="timing" className="px-6 py-2 rounded-md data-[state=active]:bg-emerald-600 data-[state=active]:text-white font-bold">Timing & Valuation</TabsTrigger>
                                 <TabsTrigger value="dividends" className="px-6 py-2 rounded-md data-[state=active]:bg-blue-600 data-[state=active]:text-white">Dividends</TabsTrigger>
                                 <TabsTrigger value="financials" className="px-6 py-2 rounded-md data-[state=active]:bg-blue-600 data-[state=active]:text-white">Financials</TabsTrigger>
                                 <TabsTrigger value="summary" className="px-6 py-2 rounded-md data-[state=active]:bg-blue-600 data-[state=active]:text-white">Business Summary</TabsTrigger>
                             </TabsList>
+
+                            <TabsContent value="timing" className="mt-6">
+                                <TimingTab ticker={effectiveTicker} />
+                            </TabsContent>
 
                             <TabsContent value="dividends" className="space-y-6 mt-6">
                                 <div className="grid md:grid-cols-2 gap-6">

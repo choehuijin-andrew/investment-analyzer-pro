@@ -97,7 +97,8 @@ const DrawdownChart: React.FC<DrawdownChartProps> = ({ data }) => {
                         <Tooltip
                             contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
                             itemStyle={{ color: '#e2e8f0' }}
-                            formatter={(value: any) => [typeof value === 'number' ? `${value.toFixed(2)}%` : value, '']}
+                            formatter={(value: number | undefined, name: any) => [value !== undefined ? value.toFixed(2) + "%" : "N/A", name]}
+                            itemSorter={(item) => Math.abs(item.value as number) * -1}
                         />
                         <Legend wrapperStyle={{ paddingTop: '10px' }} />
                         {tickers.map((ticker, index) => (

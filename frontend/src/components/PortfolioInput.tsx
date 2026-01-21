@@ -3,15 +3,24 @@ import React, { useState } from 'react';
 import { projectIncome, PortfolioItem } from '@/lib/api';
 import DividendDashboard from './DividendDashboard'; // Reuse existing dashboard for results
 
-const PortfolioInput: React.FC = () => {
-    // Default rows
-    const [rows, setRows] = useState<PortfolioItem[]>([
-        { ticker: 'SCHD', shares: 100, cost_basis: 75, monthly_contribution: 500 },
-        { ticker: 'O', shares: 50, cost_basis: 60, monthly_contribution: 0 },
-        { ticker: 'JEPI', shares: 200, cost_basis: 55, monthly_contribution: 0 },
-        { ticker: '', shares: 0, cost_basis: 0, monthly_contribution: 0 }, // Empty row
-        { ticker: '', shares: 0, cost_basis: 0, monthly_contribution: 0 },
-    ]);
+interface PortfolioInputProps {
+    initialTickers?: string[];
+}
+
+const PortfolioInput: React.FC<PortfolioInputProps> = ({ initialTickers = [] }) => {
+    // Default rows based on props or fallback
+    const [rows, setRows] = useState<PortfolioItem[]>(() => {
+        if (initialTickers.length > 0) {
+            return initialTickers.map(t => ({ ticker: t, shares: 0, cost_basis: 0, monthly_contribution: 0 }));
+        }
+        return [
+            { ticker: 'SCHD', shares: 100, cost_basis: 75, monthly_contribution: 500 },
+            { ticker: 'O', shares: 50, cost_basis: 60, monthly_contribution: 0 },
+            { ticker: 'JEPI', shares: 200, cost_basis: 55, monthly_contribution: 0 },
+            { ticker: '', shares: 0, cost_basis: 0, monthly_contribution: 0 },
+            { ticker: '', shares: 0, cost_basis: 0, monthly_contribution: 0 },
+        ];
+    });
 
     const [analyzing, setAnalyzing] = useState(false);
     const [showDashboard, setShowDashboard] = useState(false);

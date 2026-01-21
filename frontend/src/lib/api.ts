@@ -83,4 +83,9 @@ export const getPriceHistory = async (ticker: string, period: string, interval: 
     return response.data;
 };
 
+export const getTechnicalAnalysis = async (ticker: string) => {
+    const response = await api.get(`/technical/${ticker}`);
+    return response.data;
+};
+
 export default api;

@@ -220,6 +220,17 @@ def get_stock_details_endpoint(ticker: str):
              raise HTTPException(status_code=503, detail="External API Rate Limit. Please try again later.")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/technical/{ticker}")
+def get_technical_analysis_endpoint(ticker: str):
+    try:
+        data = analysis.get_technical_analysis(ticker)
+        if not data:
+             raise HTTPException(status_code=404, detail="Analysis failed or no data")
+        return analysis.clean_nans(data)
+    except Exception as e:
+        print(f"Technical Endpoint Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/history/{ticker}")
 def get_price_history(ticker: str, period: str = "1y", interval: str = "1d"):
     """

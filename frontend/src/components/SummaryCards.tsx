@@ -14,12 +14,13 @@ interface SummaryCardsProps {
 }
 
 const Card = ({ title, value, sub, icon: Icon, color }: any) => (
-    <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col justify-between hover:border-slate-600 transition-colors shadow-sm min-w-[240px] snap-center flex-1">
-        <div className="flex justify-between items-start mb-2">
-            <span className="text-slate-400 text-sm font-medium">{title}</span>
-            <div className={`p-2 rounded-lg bg-opacity-10 ${color.bg}`}>
+    <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col justify-between hover:border-slate-600 transition-colors shadow-sm min-w-[200px] snap-center flex-1">
+        <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-2">
                 <Icon className={`w-5 h-5 ${color.text}`} />
+                <span className="text-slate-400 text-sm font-medium">{title}</span>
             </div>
+            {/* Removed the large color box as requested */}
         </div>
         <div>
             <h3 className="text-2xl font-bold text-white">{value}</h3>

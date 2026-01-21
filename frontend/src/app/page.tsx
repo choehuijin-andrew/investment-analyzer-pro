@@ -189,7 +189,7 @@ export default function Home() {
               {/* 4. Portfolio Editor */}
               {activeTab === 'portfolio' && (
                 <div className="max-w-4xl mx-auto">
-                  <PortfolioInput />
+                  <PortfolioInput initialTickers={analysisParams?.tickers} />
                 </div>
               )}
             </div>
