@@ -9,7 +9,7 @@ import CorrelationHeatmap from '@/components/charts/CorrelationHeatmap';
 import EtfComparison from '@/components/EtfComparison';
 import RollingReturns from '@/components/charts/RollingReturns';
 import DrawdownChart from '@/components/charts/DrawdownChart';
-import DividendDashboard from '@/components/DividendDashboard';
+
 import PortfolioInput from '@/components/PortfolioInput';
 import StockDashboard from '@/components/StockDashboard/StockDashboard';
 import StockSidebar from '@/components/StockDashboard/StockSidebar';
@@ -145,14 +145,14 @@ export default function Home() {
               {activeTab === 'dashboard' && data && (
                 <>
                   <SummaryCards stats={data.summary} />
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[400px]">
-                    <div className="h-[300px] lg:h-full min-h-0"><CumulativeReturns dataTR={data.charts.trend_tr} dataPR={data.charts.trend_pr} /></div>
-                    <div className="h-[300px] lg:h-full min-h-0"><RiskRewardScatter stats={data.summary} /></div>
-                    <div className="h-[300px] lg:h-full min-h-0"><SimulatorContainer data={data.charts.allocation_curve} availableTickers={data.summary ? Object.keys(data.summary) : []} /></div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-[minmax(400px,auto)]">
+                    <div className="min-h-[400px] h-full"><CumulativeReturns dataTR={data.charts.trend_tr} dataPR={data.charts.trend_pr} /></div>
+                    <div className="min-h-[400px] h-full"><RiskRewardScatter stats={data.summary} /></div>
+                    <div className="min-h-[400px] h-full"><SimulatorContainer data={data.charts.allocation_curve} availableTickers={data.summary ? Object.keys(data.summary) : []} /></div>
                   </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-auto lg:h-[500px]">
-                    <div className="h-[400px] lg:h-full min-h-0 overflow-hidden"><CorrelationHeatmap data={data.charts.correlation} /></div>
-                    <div className="h-[400px] lg:h-full min-h-0 overflow-hidden"><EtfComparison availableTickers={data.summary ? Object.keys(data.summary) : []} /></div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 auto-rows-[minmax(500px,auto)]">
+                    <div className="min-h-[450px] h-full overflow-hidden"><CorrelationHeatmap data={data.charts.correlation} /></div>
+                    <div className="min-h-[450px] h-full overflow-hidden"><EtfComparison availableTickers={data.summary ? Object.keys(data.summary) : []} /></div>
                   </div>
                 </>
               )}
@@ -167,13 +167,9 @@ export default function Home() {
                     </div>
                   ) : (
                     <>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="h-[300px] lg:h-full min-h-0"><RollingReturns data={advancedData.rolling_1y} /></div>
-                        <div className="h-[300px] lg:h-full min-h-0"><DrawdownChart data={advancedData.drawdowns} /></div>
-                      </div>
-                      <div className="mt-8 border-t border-slate-800 pt-8">
-                        <h2 className="text-2xl font-bold text-white mb-6">Income Strategy Analysis</h2>
-                        <DividendDashboard tickers={analysisParams?.tickers || []} />
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 auto-rows-[minmax(400px,auto)]">
+                        <div className="min-h-[400px] h-full"><RollingReturns data={advancedData.rolling_1y} /></div>
+                        <div className="min-h-[400px] h-full"><DrawdownChart data={advancedData.drawdowns} /></div>
                       </div>
                     </>
                   )}

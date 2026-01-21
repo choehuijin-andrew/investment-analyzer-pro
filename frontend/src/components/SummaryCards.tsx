@@ -14,7 +14,7 @@ interface SummaryCardsProps {
 }
 
 const Card = ({ title, value, sub, icon: Icon, color }: any) => (
-    <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col justify-between hover:border-slate-600 transition-colors shadow-sm">
+    <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col justify-between hover:border-slate-600 transition-colors shadow-sm min-w-[240px] snap-center flex-1">
         <div className="flex justify-between items-start mb-2">
             <span className="text-slate-400 text-sm font-medium">{title}</span>
             <div className={`p-2 rounded-lg bg-opacity-10 ${color.bg}`}>
@@ -44,7 +44,7 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({ stats }) => {
     const avgVol = (tickers.reduce((sum, t) => sum + stats[t].volatility, 0) / tickers.length * 100).toFixed(2);
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="flex overflow-x-auto pb-4 gap-4 snap-x snap-mandatory lg:grid lg:grid-cols-4 lg:overflow-visible">
             <Card
                 title="Best Performer"
                 value={`${bestTicker}`}

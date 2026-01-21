@@ -94,7 +94,7 @@ def simulate_multi_endpoint(req: SimulationRequest):
         # Only using tickers from SimulationRequest
         print(f"Multi-asset simulation for {req.tickers}")
         result = analysis.simulate_multi_asset_monte_carlo(req.tickers)
-        return {"simulation": result}
+        return analysis.clean_nans({"simulation": result})
     except Exception as e:
         print(f"Multi-asset Simulation Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -148,7 +148,7 @@ def simulate_allocation(request: SimulationRequest):
         daily_returns = df_tr.pct_change().dropna()
         curve = analysis.calculate_allocation_curve(daily_returns)
         
-        return {"curve": curve}
+        return analysis.clean_nans({"curve": curve})
         
     except Exception as e:
         print(f"Simulation Error: {e}")
@@ -188,7 +188,7 @@ def analyze_portfolio(request: AnalyzeRequest):
         if 'daily_returns' in metrics:
             del metrics['daily_returns']
         
-        return {
+        return analysis.clean_nans({
             "summary": metrics['stats'],
             "charts": {
                 "trend_tr": metrics['timeseries_tr'],
@@ -196,8 +196,10 @@ def analyze_portfolio(request: AnalyzeRequest):
                 "correlation": metrics['correlation'],
                 "allocation_curve": allocation_curve
             }
-        }
+        })
         
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         print(f"Error: {e}")
         import traceback

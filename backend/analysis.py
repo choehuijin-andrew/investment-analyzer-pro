@@ -93,9 +93,6 @@ def get_etf_holdings(tickers: List[str]):
                          holdings_list = h_df.index.tolist()
                          holdings[t] = holdings_list
                          print(f"[DEBUG] {t} holdings found: {len(holdings_list)} (Top 5: {holdings_list[:5]})")
-                     else:
-                         print(f"[DEBUG] {t} funds_data.top_holdings has no index")
-                         holdings[t] = []
                 else:
                     print(f"[DEBUG] {t} funds_data.top_holdings is None")
                     holdings[t] = []
