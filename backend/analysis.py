@@ -28,15 +28,23 @@ def fetch_data(tickers: List[str], start_date: str, end_date: str):
     # Handle Single Ticker Case (Columns are flat: Open, High...)
     if len(tickers) == 1:
         # Check if 'Adj Close' exists (auto_adjust=False ensures it usually)
-        # But if auto_adjust=True (default in some versions), it returns only Close (which is adjusted)
-        # We explicitly asked for False, so 'Adj Close' should be there.
         t = tickers[0]
+        # Some yfinance versions might return MultiIndex even for 1 ticker if forced? No.
+        # But let's check columns.
+        
         adj_col = 'Adj Close' if 'Adj Close' in data.columns else 'Close'
         
-        df_tr = data[[adj_col]].rename(columns={adj_col: t})
-        df_pr = data[['Close']].rename(columns={'Close': t})
-        
-        return df_tr.dropna(), df_pr.dropna()
+        # If data is empty
+        if data.empty:
+            return pd.DataFrame(), pd.DataFrame()
+            
+        try:
+             df_tr = data[[adj_col]].rename(columns={adj_col: t})
+             df_pr = data[['Close']].rename(columns={'Close': t})
+             return df_tr.dropna(), df_pr.dropna()
+        except:
+             # Fallback if something weird with columns
+             return pd.DataFrame(), pd.DataFrame()
 
     # Multi Ticker Case
     # Columns are MultiIndex: ('Adj Close', 'SPY'), ('Close', 'SPY')...

@@ -170,6 +170,7 @@ const AssetAllocationCurve: React.FC<AssetAllocationCurveProps> = ({ data, avail
                             stroke="#94a3b8"
                             label={{ value: 'Risk (Volatility)', position: 'insideBottomRight', offset: -5, fill: '#64748b' }}
                             domain={xDomain}
+                            tickFormatter={(val: number) => val.toFixed(2)}
                             allowDataOverflow
                             padding={{ left: 20, right: 20 }}
                         />
@@ -181,6 +182,7 @@ const AssetAllocationCurve: React.FC<AssetAllocationCurveProps> = ({ data, avail
                             stroke="#94a3b8"
                             label={{ value: 'Return (CAGR)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
                             domain={yDomain}
+                            tickFormatter={(val: number) => val.toFixed(2)}
                             allowDataOverflow
                             padding={{ top: 20, bottom: 20 }}
                         />

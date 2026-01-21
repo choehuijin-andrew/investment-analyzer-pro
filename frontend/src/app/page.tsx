@@ -45,6 +45,7 @@ export default function Home() {
     setLoading(true);
     setAdvancedData(null); // Reset cache for advanced tab
     setAnalysisParams({ tickers, start, end });
+    setInspectorTicker(tickers[0]); // Update Inspector Default to first ticker
     try {
       const result = await analyzePortfolio(tickers, start, end);
       setData(result);
