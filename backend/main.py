@@ -214,6 +214,10 @@ def get_stock_details_endpoint(ticker: str):
             raise HTTPException(status_code=404, detail="Ticker not found or data unavailable")
         return details
     except Exception as e:
+        print(f"Detail Endpoint Error: {e}")
+        error_msg = str(e)
+        if "Rate limited" in error_msg or "Too Many Requests" in error_msg:
+             raise HTTPException(status_code=503, detail="External API Rate Limit. Please try again later.")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/history/{ticker}")

@@ -53,10 +53,14 @@ const CustomLabel = (props: any) => {
 };
 
 const RiskRewardScatter: React.FC<RiskRewardScatterProps> = ({ stats }) => {
-    const [xMin, setXMin] = useState<string>('');
-    const [xMax, setXMax] = useState<string>('');
-    const [yMin, setYMin] = useState<string>('');
-    const [yMax, setYMax] = useState<string>('');
+    const [xDomain, setXDomain] = useState<[number | 'auto', number | 'auto']>(['auto', 'auto']);
+    const [yDomain, setYDomain] = useState<[number | 'auto', number | 'auto']>(['auto', 'auto']);
+
+    // Reset when stats change
+    React.useEffect(() => {
+        setXDomain(['auto', 'auto']);
+        setYDomain(['auto', 'auto']);
+    }, [stats]);
 
     if (!stats) return null;
 
@@ -89,8 +93,46 @@ const RiskRewardScatter: React.FC<RiskRewardScatterProps> = ({ stats }) => {
         }
     }
 
+    const handleWheel = (e: React.WheelEvent) => {
+        const xValues = data.map(d => d.x);
+        const yValues = data.map(d => d.y);
+        const minX = Math.min(...xValues);
+        const maxX = Math.max(...xValues);
+        const minY = Math.min(...yValues);
+        const maxY = Math.max(...yValues);
+
+        let curMinX = typeof xDomain[0] === 'number' ? xDomain[0] : (minX * 0.9);
+        let curMaxX = typeof xDomain[1] === 'number' ? xDomain[1] : (maxX * 1.1);
+        let curMinY = typeof yDomain[0] === 'number' ? yDomain[0] : (minY * 0.9);
+        let curMaxY = typeof yDomain[1] === 'number' ? yDomain[1] : (maxY * 1.1);
+
+        const direction = e.deltaY > 0 ? 1 : -1;
+        const factor = 0.1;
+
+        const xRange = curMaxX - curMinX;
+        const yRange = curMaxY - curMinY;
+
+        if (direction === -1) {
+            curMinX += xRange * factor;
+            curMaxX -= xRange * factor;
+            curMinY += yRange * factor;
+            curMaxY -= yRange * factor;
+        } else {
+            curMinX -= xRange * factor;
+            curMaxX += xRange * factor;
+            curMinY -= yRange * factor;
+            curMaxY += yRange * factor;
+        }
+
+        setXDomain([curMinX, curMaxX]);
+        setYDomain([curMinY, curMaxY]);
+    };
+
     return (
-        <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm h-full min-h-[400px] flex flex-col">
+        <div
+            className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm h-full min-h-[400px] flex flex-col"
+            onWheel={handleWheel}
+        >
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <div className="flex items-center gap-2">
@@ -103,16 +145,8 @@ const RiskRewardScatter: React.FC<RiskRewardScatterProps> = ({ stats }) => {
                     <span className="text-xs text-slate-500">X: Max Drawdown (Risk), Y: CAGR (Return)</span>
                 </div>
 
-                {/* Axis Controls */}
-                <div className="flex gap-2 text-xs">
-                    <div className="flex flex-col gap-1">
-                        <input placeholder="Min X" className="bg-slate-900 border border-slate-700 w-12 px-1 rounded text-white" value={xMin} onChange={e => setXMin(e.target.value)} />
-                        <input placeholder="Max X" className="bg-slate-900 border border-slate-700 w-12 px-1 rounded text-white" value={xMax} onChange={e => setXMax(e.target.value)} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <input placeholder="Min Y" className="bg-slate-900 border border-slate-700 w-12 px-1 rounded text-white" value={yMin} onChange={e => setYMin(e.target.value)} />
-                        <input placeholder="Max Y" className="bg-slate-900 border border-slate-700 w-12 px-1 rounded text-white" value={yMax} onChange={e => setYMax(e.target.value)} />
-                    </div>
+                <div className="flex gap-2 text-xs text-slate-500">
+                    Scroll to Zoom
                 </div>
             </div>
 
@@ -127,7 +161,7 @@ const RiskRewardScatter: React.FC<RiskRewardScatterProps> = ({ stats }) => {
                             unit="%"
                             stroke="#94a3b8"
                             label={{ value: 'Risk (MDD)', position: 'insideBottomRight', offset: -5, fill: '#64748b' }}
-                            domain={[xMin ? Number(xMin) : 'auto', xMax ? Number(xMax) : 'auto']}
+                            domain={xDomain}
                             allowDataOverflow
                             padding={{ left: 20, right: 20 }}
                         />
@@ -138,7 +172,7 @@ const RiskRewardScatter: React.FC<RiskRewardScatterProps> = ({ stats }) => {
                             unit="%"
                             stroke="#94a3b8"
                             label={{ value: 'Return (CAGR)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
-                            domain={[yMin ? Number(yMin) : 'auto', yMax ? Number(yMax) : 'auto']}
+                            domain={yDomain}
                             allowDataOverflow
                             padding={{ top: 20, bottom: 20 }}
                         />

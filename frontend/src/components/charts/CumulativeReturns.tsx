@@ -140,7 +140,7 @@ const CumulativeReturns: React.FC<CumulativeReturnsProps> = ({ dataTR, dataPR })
                             contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
                             itemStyle={{ color: '#e2e8f0' }}
                             itemSorter={(item) => (item.value as number) * -1} // Sort Descending
-                            formatter={(value: number | undefined) => [typeof value === 'number' ? `${value.toFixed(2)}%` : 'N/A', '']}
+                            formatter={(value: number | undefined, name: any) => [typeof value === 'number' ? `${value.toFixed(2)}%` : 'N/A', name]}
                             labelStyle={{ color: '#94a3b8', marginBottom: '0.5rem' }}
                         />
                         <Legend wrapperStyle={{ paddingTop: '10px' }} />
