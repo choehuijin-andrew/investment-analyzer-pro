@@ -829,10 +829,16 @@ def get_technical_analysis(ticker: str, period="2y"):
         # Ensure we work with clean series
         if 'Close' not in df.columns: return None
         
-        close = df['Close']
-        high = df['High']
-        low = df['Low'] 
-        volume = df['Volume']
+        # Helper to ensure 1D Series
+        def to_series(data):
+            if isinstance(data, pd.DataFrame):
+                return data.iloc[:, 0]
+            return data
+
+        close = to_series(df['Close'])
+        high = to_series(df['High'])
+        low = to_series(df['Low'])
+        volume = to_series(df['Volume'])
         
         # If series is empty
         if close.empty: return None
