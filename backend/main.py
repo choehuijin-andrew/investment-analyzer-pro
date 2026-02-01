@@ -11,11 +11,11 @@ import os
 app = FastAPI(title="Investment Analyzer API")
 
 # CORS Setup (Allow Frontend)
-origins = ["http://localhost:3000", os.getenv("FRONTEND_URL")]
+origins = ["*"] # Allow all origins for local network usage
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o for o in origins if o], 
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,8 +93,9 @@ def simulate_multi_endpoint(req: SimulationRequest):
     try:
         # Only using tickers from SimulationRequest
         print(f"Multi-asset simulation for {req.tickers}")
-        result = analysis.simulate_multi_asset_monte_carlo(req.tickers)
-        return analysis.clean_nans({"simulation": result})
+        # Returns dict with frontier, max_sharpe, min_vol
+        result = analysis.simulate_multi_asset_optimized(req.tickers)
+        return analysis.clean_nans(result)
     except Exception as e:
         print(f"Multi-asset Simulation Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -213,6 +214,8 @@ def get_stock_details_endpoint(ticker: str):
         if not details:
             raise HTTPException(status_code=404, detail="Ticker not found or data unavailable")
         return details
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         print(f"Detail Endpoint Error: {e}")
         error_msg = str(e)
@@ -286,6 +289,14 @@ def get_price_history(ticker: str, period: str = "1y", interval: str = "1d"):
         
     except Exception as e:
         print(f"History Error {ticker}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/search")
+def search_stocks(query: str):
+    try:
+        results = analysis.search_ticker(query)
+        return results
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

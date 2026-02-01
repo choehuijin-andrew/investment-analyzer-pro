@@ -130,16 +130,16 @@ const RiskRewardScatter: React.FC<RiskRewardScatterProps> = ({ stats }) => {
 
     return (
         <div
-            className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm h-full min-h-[400px] flex flex-col"
+            className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm h-full flex flex-col relative"
             onWheel={handleWheel}
         >
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-bold text-white">Risk vs Reward Analysis</h3>
+                        <h3 className="text-lg font-bold text-white">Risk and Return Analysis</h3>
                         <ChartInfo
-                            title="위험 대비 수익 (Risk vs Reward)"
-                            description="각 자산의 변동성(위험) 대비 연평균 수익률을 보여줍니다. 좌측 상단(저위험 고수익)에 위치할수록 효율적인 투자처입니다."
+                            title="Risk and Return Analysis"
+                            description="Shows Expected Return (CAGR) vs Risk (Max Drawdown). Top-left quadrant (High Return, Low Risk) is ideal."
                         />
                     </div>
                     <span className="text-xs text-slate-500">X: Max Drawdown (Risk), Y: CAGR (Return)</span>
@@ -204,7 +204,7 @@ const RiskRewardScatter: React.FC<RiskRewardScatterProps> = ({ stats }) => {
                     </ScatterChart>
                 </ResponsiveContainer>
             </div>
-        </div>
+        </div >
     );
 };
 

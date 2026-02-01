@@ -23,7 +23,12 @@ const MultiAssetSimulator: React.FC = () => {
     // State
     const [tickers, setTickers] = useState<string[]>(['SPY', 'QQQ', 'TLT']);
     const [inputValue, setInputValue] = useState('');
-    const [data, setData] = useState<SimulationResult[]>([]);
+
+    // New Data Structure
+    const [frontier, setFrontier] = useState<SimulationResult[]>([]);
+    const [maxSharpe, setMaxSharpe] = useState<SimulationResult | null>(null);
+    const [minVol, setMinVol] = useState<SimulationResult | null>(null);
+
     const [loading, setLoading] = useState(false);
     const [selectedPoint, setSelectedPoint] = useState<SimulationResult | null>(null);
 
@@ -45,8 +50,17 @@ const MultiAssetSimulator: React.FC = () => {
         setLoading(true);
         try {
             const res = await simulateMultiAsset(tickers);
-            setData(res.simulation);
-            setSelectedPoint(null);
+            // Backend now returns { frontier, max_sharpe, min_vol }
+            if (res.frontier) {
+                setFrontier(res.frontier);
+                setMaxSharpe(res.max_sharpe);
+                setMinVol(res.min_vol);
+                setSelectedPoint(res.max_sharpe); // Default select Max Sharpe
+            } else {
+                // Fallback for legacy format if any
+                setFrontier(res.simulation || []);
+                setSelectedPoint(null);
+            }
         } catch (e) {
             console.error(e);
             alert("Simulation failed");
@@ -54,32 +68,8 @@ const MultiAssetSimulator: React.FC = () => {
         setLoading(false);
     };
 
-    // Helper to get color based on Sharpe
-    const getSharpeColor = (sharpe: number, min: number, max: number) => {
-        const ratio = (sharpe - min) / (max - min || 1);
-        // Simple Gradient: Blue (0) -> Green (0.5) -> Red (1)
-        if (ratio < 0.5) {
-            // Blue (#3b82f6) to Green (#10b981)
-            // Blue: [59, 130, 246], Green: [16, 185, 129]
-            const r = 59 + (16 - 59) * (ratio * 2);
-            const g = 130 + (185 - 130) * (ratio * 2);
-            const b = 246 + (129 - 246) * (ratio * 2);
-            return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
-        } else {
-            // Green (#10b981) to Red (#ef4444)
-            // Green: [16, 185, 129], Red: [239, 68, 68]
-            const r = 16 + (239 - 16) * ((ratio - 0.5) * 2);
-            const g = 185 + (68 - 185) * ((ratio - 0.5) * 2);
-            const b = 129 + (68 - 129) * ((ratio - 0.5) * 2);
-            return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
-        }
-    };
-
-    // Derived Stats
-    const minSharpe = Math.min(...data.map(d => d.sharpe));
-    const maxSharpe = Math.max(...data.map(d => d.sharpe));
-    const maxSharpePoint = data.find(d => d.sharpe === maxSharpe);
-    const minVolPoint = data.reduce((prev, curr) => (prev && prev.risk < curr.risk) ? prev : curr, data[0]);
+    // Helper to get color based on Sharpe (reuses existing logic if needed, but curve is usually single color)
+    // We will color the line simply, and highlight special points.
 
     return (
         <div className="h-full flex flex-col gap-4">
@@ -108,25 +98,43 @@ const MultiAssetSimulator: React.FC = () => {
                     disabled={loading || tickers.length < 2}
                     className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs px-4 py-2 rounded font-bold"
                 >
-                    {loading ? 'Simulating...' : 'Run Simulation'}
+                    {loading ? 'Optimizing...' : 'Run Analysis'}
                 </button>
             </div>
 
             {/* Content: Chart + Details */}
-            <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
+            <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0 overflow-hidden overflow-y-auto lg:overflow-y-hidden">
                 {/* Chart Area */}
-                <div className="flex-1 bg-slate-900 rounded p-2 relative flex flex-col min-h-0">
-                    {!data.length && !loading && (
+                <div className="flex-1 bg-slate-900 rounded p-2 relative flex flex-col min-h-[300px] lg:min-h-0">
+                    {!frontier.length && !loading && (
                         <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">
-                            Add assets and click Run to simulate portfolios.
+                            Add assets and click Run to calculate Efficient Frontier.
                         </div>
                     )}
                     <div className="flex-1 min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
                             <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                <XAxis type="number" dataKey="risk" name="Risk" unit="" stroke="#94a3b8" tickFormatter={v => (v * 100).toFixed(1) + '%'} label={{ value: 'Risk (Volatility)', position: 'insideBottom', offset: -10, fill: '#64748b', fontSize: 12 }} />
-                                <YAxis type="number" dataKey="return" name="Return" unit="" stroke="#94a3b8" tickFormatter={v => (v * 100).toFixed(1) + '%'} label={{ value: 'Return (CAGR)', angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 12 }} />
+                                <XAxis
+                                    type="number"
+                                    dataKey="risk"
+                                    name="Risk"
+                                    stroke="#94a3b8"
+                                    tickFormatter={v => (v * 100).toFixed(1) + '%'}
+                                    domain={['auto', 'auto']}
+                                    padding={{ left: 20, right: 20 }}
+                                    label={{ value: 'Risk (Volatility)', position: 'insideBottom', offset: -5, fill: '#64748b', fontSize: 12 }}
+                                />
+                                <YAxis
+                                    type="number"
+                                    dataKey="return"
+                                    name="Return"
+                                    stroke="#94a3b8"
+                                    tickFormatter={v => (v * 100).toFixed(1) + '%'}
+                                    domain={['auto', 'auto']}
+                                    padding={{ top: 20, bottom: 20 }}
+                                    label={{ value: 'Return (CAGR)', angle: -90, position: 'insideLeft', fill: '#64748b', fontSize: 12 }}
+                                />
                                 <Tooltip
                                     cursor={{ strokeDasharray: '3 3' }}
                                     content={({ active, payload }) => {
@@ -135,53 +143,47 @@ const MultiAssetSimulator: React.FC = () => {
                                             return (
                                                 <div className="bg-slate-800 border border-slate-600 p-2 rounded shadow-xl text-xs text-white">
                                                     <div className="font-bold mb-1 text-emerald-400">
-                                                        {d === maxSharpePoint ? "★ Max Sharpe" : (d === minVolPoint ? "◆ Min Volatility" : "Portfolio Stats")}
+                                                        {d === maxSharpe ? "★ Max Sharpe" : (d === minVol ? "◆ Min Volatility" : "Efficient Point")}
                                                     </div>
                                                     <div>Return: {(d.return * 100).toFixed(2)}%</div>
                                                     <div>Risk: {(d.risk * 100).toFixed(2)}%</div>
                                                     <div>Sharpe: {d.sharpe.toFixed(2)}</div>
-                                                    <div className="text-slate-400 mt-1 border-t border-slate-700 pt-1">
-                                                        {/* Show top holding */}
-                                                        Top: {Object.entries(d.weights as Record<string, number>).sort((a, b) => b[1] - a[1])[0][0]}
-                                                        ({(Object.entries(d.weights as Record<string, number>).sort((a, b) => b[1] - a[1])[0][1] * 100).toFixed(0)}%)
-                                                    </div>
                                                 </div>
                                             );
                                         }
                                         return null;
                                     }}
                                 />
+                                {/* Efficient Frontier Line */}
                                 <Scatter
-                                    name="Portfolios"
-                                    data={data}
+                                    name="Efficient Frontier"
+                                    data={frontier}
                                     fill="#8884d8"
+                                    line={{ stroke: '#8b5cf6', strokeWidth: 2 }}
+                                    shape="circle"
                                     onClick={(data) => setSelectedPoint(data.payload)}
-                                >
-                                    {data.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={getSharpeColor(entry.sharpe, minSharpe, maxSharpe)} />
-                                    ))}
-                                </Scatter>
-
+                                />
                                 {/* Highlights */}
-                                {maxSharpePoint && (
-                                    <Scatter name="Max Sharpe" data={[maxSharpePoint]} fill="#f59e0b" shape="star" zAxisId={10} onClick={(data) => setSelectedPoint(data.payload)}>
+                                {maxSharpe && (
+                                    <Scatter name="Max Sharpe" data={[maxSharpe]} fill="#f59e0b" shape="star" zAxisId={10} onClick={(data) => setSelectedPoint(data.payload)}>
                                         <Cell fill="#f59e0b" stroke="#fff" strokeWidth={2} />
                                     </Scatter>
                                 )}
-                                {minVolPoint && (
-                                    <Scatter name="Min Vol" data={[minVolPoint]} fill="#3b82f6" shape="diamond" zAxisId={10} onClick={(data) => setSelectedPoint(data.payload)}>
+                                {minVol && (
+                                    <Scatter name="Min Vol" data={[minVol]} fill="#3b82f6" shape="diamond" zAxisId={10} onClick={(data) => setSelectedPoint(data.payload)}>
                                         <Cell fill="#3b82f6" stroke="#fff" strokeWidth={2} />
                                     </Scatter>
                                 )}
                             </ScatterChart>
                         </ResponsiveContainer>
                     </div>
+
                 </div>
 
                 {/* Details Panel */}
-                <div className="w-48 bg-slate-900 rounded p-3 flex flex-col">
+                <div className="w-full lg:w-48 bg-slate-900 rounded p-3 flex flex-col h-auto lg:h-full shrink-0">
                     <h4 className="text-white text-xs font-bold mb-2 uppercase border-b border-slate-700 pb-1">
-                        {selectedPoint ? (selectedPoint === maxSharpePoint ? '★ Max Sharpe' : (selectedPoint === minVolPoint ? '◆ Min Volatility' : 'Selected Portfolio')) : 'Select a Point'}
+                        {selectedPoint ? 'Portfolio Details' : 'Select a Point'}
                     </h4>
 
                     {selectedPoint ? (
@@ -221,14 +223,8 @@ const MultiAssetSimulator: React.FC = () => {
                             </table>
                         </div>
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-500 text-[10px] gap-2">
-                            <p>Click any dot to view details.</p>
-                            <div className="flex gap-2 items-center">
-                                <span className="w-3 h-3 bg-amber-500 rounded-full flex items-center justify-center text-[8px] text-white">★</span> Max Sharpe
-                            </div>
-                            <div className="flex gap-2 items-center">
-                                <span className="w-3 h-3 bg-blue-500 rotate-45 flex items-center justify-center"></span> Min Vol
-                            </div>
+                        <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-500 text-[10px] gap-2 min-h-[100px] lg:min-h-0">
+                            <p>Click the Chart or Table to view details.</p>
                         </div>
                     )}
                 </div>

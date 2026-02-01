@@ -146,10 +146,9 @@ export default function Home() {
               {activeTab === 'dashboard' && data && (
                 <>
                   <SummaryCards stats={data.summary} />
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-[minmax(400px,auto)]">
-                    <div className="min-h-[400px] h-full"><CumulativeReturns dataTR={data.charts.trend_tr} dataPR={data.charts.trend_pr} /></div>
-                    <div className="min-h-[400px] h-full"><RiskRewardScatter stats={data.summary} /></div>
-                    <div className="min-h-[400px] h-full"><SimulatorContainer data={data.charts.allocation_curve} availableTickers={data.summary ? Object.keys(data.summary) : []} /></div>
+                  {/* Expanded Cumulative Returns */}
+                  <div className="grid grid-cols-1 gap-6 auto-rows-[minmax(450px,auto)]">
+                    <div className="h-full"><CumulativeReturns dataTR={data.charts.trend_tr} dataPR={data.charts.trend_pr} /></div>
                   </div>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 auto-rows-[minmax(500px,auto)]">
                     <div className="min-h-[450px] h-full overflow-hidden"><CorrelationHeatmap data={data.charts.correlation} /></div>
@@ -168,6 +167,15 @@ export default function Home() {
                     </div>
                   ) : (
                     <>
+                      {/* Row 1: Moved Risk & Simulator */}
+                      {data && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 auto-rows-[minmax(450px,auto)]">
+                          <div className="min-h-[450px] h-full"><RiskRewardScatter stats={data.summary} /></div>
+                          <div className="min-h-[450px] h-full"><SimulatorContainer data={data.charts.allocation_curve} availableTickers={data.summary ? Object.keys(data.summary) : []} /></div>
+                        </div>
+                      )}
+
+                      {/* Row 2: Rolling & Drawdown */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 auto-rows-[minmax(400px,auto)]">
                         <div className="min-h-[400px] h-full"><RollingReturns data={advancedData.rolling_1y} /></div>
                         <div className="min-h-[400px] h-full"><DrawdownChart data={advancedData.drawdowns} /></div>

@@ -17,3 +17,7 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Debug and Test files
+*_debug.txt
+test_*.py

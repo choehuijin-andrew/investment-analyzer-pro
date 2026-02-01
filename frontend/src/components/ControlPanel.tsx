@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Calendar, Play } from 'lucide-react';
+import { Search, Calendar, Play, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import StockSearchModal from './StockSearchModal';
 
 interface ControlPanelProps {
     onAnalyze: (tickers: string[], startDate: string, endDate: string) => void;
@@ -11,10 +12,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onAnalyze, isLoading }) => 
     const [tickersInput, setTickersInput] = useState('SPY, QQQ, SCHD, TLT, GLD');
     const [startDate, setStartDate] = useState('2020-01-01');
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     const handleAnalyze = () => {
         const tickers = tickersInput.split(',').map((t) => t.trim().toUpperCase()).filter(t => t);
         onAnalyze(tickers, startDate, endDate);
+    };
+
+    const handleAddTicker = (ticker: string) => {
+        const current = tickersInput.split(',').map(t => t.trim()).filter(t => t);
+        if (!current.includes(ticker)) {
+            setTickersInput([...current, ticker].join(', '));
+        }
     };
 
     return (
@@ -29,7 +38,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onAnalyze, isLoading }) => 
             <div className="space-y-4">
                 {/* Tickers Input */}
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">Tickers</label>
+                    <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium text-slate-300">Tickers</label>
+                        <button
+                            onClick={() => setIsSearchOpen(true)}
+                            className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                        >
+                            <Search className="w-3 h-3" /> Find Stock
+                        </button>
+                    </div>
                     <div className="relative">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
                         <input
@@ -92,6 +109,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({ onAnalyze, isLoading }) => 
                     Designed for high-performance backtesting. Uses Adj Close for Total Return.
                 </div>
             </div>
+
+            <StockSearchModal
+                isOpen={isSearchOpen}
+                onClose={() => setIsSearchOpen(false)}
+                onSelect={handleAddTicker}
+            />
         </div>
     );
 };

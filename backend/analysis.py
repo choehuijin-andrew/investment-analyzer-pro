@@ -8,13 +8,22 @@ from typing import List, Dict, Any
 import math
 
 def clean_nans(obj):
-    """Recursively replace NaNs with None (which becomes null in JSON)."""
+    """Recursively replace NaNs/Inf/NaT with None for JSON safety."""
     if isinstance(obj, float):
-        return None if math.isnan(obj) else obj
-    if isinstance(obj, dict):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
         return {k: clean_nans(v) for k, v in obj.items()}
-    if isinstance(obj, list):
+    elif isinstance(obj, list):
         return [clean_nans(v) for v in obj]
+    elif pd.isna(obj): # Handles pd.NA, pd.NaT, np.nan
+        return None
+    elif hasattr(obj, 'item'): # Handle numpy scalars
+        val = obj.item()
+        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+            return None
+        return val
     return obj
 
 def fetch_data(tickers: List[str], start_date: str, end_date: str):
@@ -421,59 +430,148 @@ def fetch_history_multiple(tickers: List[str], period="5y") -> pd.DataFrame:
         print(f"Error fetching history: {e}")
         return pd.DataFrame()
 
-def simulate_multi_asset_monte_carlo(tickers: List[str], n_simulations=2000):
+from scipy.optimize import minimize
+
+def get_portfolio_stats(weights, mean_returns, cov_matrix, rf=0.02):
+    """Calculates return, volatility, and sharpe."""
+    returns = np.sum(mean_returns * weights) * 252
+    volatility = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
+    sharpe = (returns - rf) / volatility if volatility > 0 else 0
+    return returns, volatility, sharpe
+
+def optimize_portfolio(mean_returns, cov_matrix, target_return=None, goal='sharpe', rf=0.02):
     """
-    Runs a Monte Carlo simulation for a portfolio of tickers.
-    Returns a list of {return, risk, sharpe, weights} objects.
+    Optimizes portfolio weights.
+    Goals: 
+      - 'sharpe': Maximize Sharpe Ratio
+      - 'volatility': Minimize Volatility (optionally for a target return)
+    """
+    num_assets = len(mean_returns)
+    args = (mean_returns, cov_matrix, rf)
+    
+    # Constraints
+    constraints = [{'type': 'eq', 'fun': lambda x: np.sum(x) - 1}] # Weights sum to 1
+    
+    if goal == 'volatility' and target_return is not None:
+        # Constraint: Return must be >= target
+        constraints.append(
+            {'type': 'eq', 'fun': lambda x: get_portfolio_stats(x, mean_returns, cov_matrix, rf)[0] - target_return}
+        )
+
+    constraints = tuple(constraints)
+
+    # Bounds: 0 <= weight <= 1
+    bounds = tuple((0.0, 1.0) for _ in range(num_assets))
+    
+    # Initial Guess: Equal weights
+    init_guess = num_assets * [1. / num_assets,]
+    
+    if goal == 'sharpe':
+        # Minimize Negative Sharpe
+        def neg_sharpe(weights, mean_returns, cov_matrix, rf):
+            return -get_portfolio_stats(weights, mean_returns, cov_matrix, rf)[2]
+        
+        result = minimize(neg_sharpe, init_guess, args=args, method='SLSQP', bounds=bounds, constraints=constraints)
+        
+    elif goal == 'volatility':
+        # Minimize Volatility
+        def portfolio_vol(weights, mean_returns, cov_matrix, rf):
+            return get_portfolio_stats(weights, mean_returns, cov_matrix, rf)[1]
+            
+        result = minimize(portfolio_vol, init_guess, args=args, method='SLSQP', bounds=bounds, constraints=constraints)
+        
+    return result
+
+def simulate_multi_asset_optimized(tickers: List[str], n_points=50):
+    """
+    Calculates the Efficient Frontier using SciPy optimization.
+    Returns:
+      - frontier: List of points on the curve
+      - max_sharpe: The max sharpe portfolio
+      - min_vol: The global minimum volatility portfolio
     """
     if len(tickers) < 2:
-        return []
+        return {}
 
-    # 1. Fetch Data
-    df = fetch_history_multiple(tickers)
+    # 1. Fetch Data (10Y for better long-term correlation/diversification view)
+    df = fetch_history_multiple(tickers, period="10y")
     if df.empty or len(df.columns) < 2:
-        return []
+        return {}
 
-    # 2. Daily Returns & Covariance
+    # 2. Daily Returns & Stats
     daily_returns = df.pct_change().dropna()
-    if daily_returns.empty: 
-        return []
+    if daily_returns.empty:
+        return {}
         
     mean_daily_returns = daily_returns.mean()
     cov_matrix = daily_returns.cov()
-
-    # Annualize
-    # Expected Annual Return = Mean Daily * 252
-    # Expected Annual Risk = sqrt(Daily Var * 252)
-    
-    results = []
-    
-    num_assets = len(df.columns)
     valid_tickers = df.columns.tolist()
+    
+    current_rf = 0.035 # Assume 3.5% Risk Free Rate for Sharpe Calculation
 
-    for _ in range(n_simulations):
-        weights = np.random.random(num_assets)
-        weights /= np.sum(weights)
+    # 3. Find Extremes
+    # Max Sharpe
+    max_sharpe_res = optimize_portfolio(mean_daily_returns, cov_matrix, goal='sharpe', rf=current_rf)
+    ms_ret, ms_vol, ms_sharpe = get_portfolio_stats(max_sharpe_res.x, mean_daily_returns, cov_matrix, rf=current_rf)
+    max_sharpe_point = {
+        "return": round(ms_ret, 4),
+        "risk": round(ms_vol, 4),
+        "sharpe": round(ms_sharpe, 4),
+        "weights": {t: round(max_sharpe_res.x[i], 4) for i, t in enumerate(valid_tickers)}
+    }
 
-        # Portfolio Return
-        port_return = np.sum(weights * mean_daily_returns) * 252
+    # Min Volatility (Global)
+    min_vol_res = optimize_portfolio(mean_daily_returns, cov_matrix, goal='volatility', rf=current_rf)
+    mv_ret, mv_vol, mv_sharpe = get_portfolio_stats(min_vol_res.x, mean_daily_returns, cov_matrix, rf=current_rf)
+    min_vol_point = {
+        "return": round(mv_ret, 4),
+        "risk": round(mv_vol, 4),
+        "sharpe": round(mv_sharpe, 4),
+        "weights": {t: round(min_vol_res.x[i], 4) for i, t in enumerate(valid_tickers)}
+    }
+    
+    # 4. Generate Frontier Points
+    # Use min(ms_ret, max_possible) to avoid plotting crazy high return points if max sharpe is super high leverage (not possible here due to constraints)
+    # Frontier typically goes from Min Vol -> Max Sharpe -> Max Return
+    
+    max_possible_return = mean_daily_returns.max() * 252
+    
+    # We want the curve to look smooth. 
+    # Range: Min Vol Return -> Max Return
+    target_returns = np.linspace(mv_ret, max_possible_return, n_points)
+    
+    frontier_points = []
+    
+    for tr in target_returns:
+        try:
+            res = optimize_portfolio(mean_daily_returns, cov_matrix, target_return=tr, goal='volatility', rf=current_rf)
+            if res.success:
+                p_ret, p_vol, p_sharpe = get_portfolio_stats(res.x, mean_daily_returns, cov_matrix, rf=current_rf)
+                frontier_points.append({
+                    "return": round(p_ret, 4),
+                    "risk": round(p_vol, 4),
+                    "sharpe": round(p_sharpe, 4),
+                    "weights": {t: round(res.x[i], 4) for i, t in enumerate(valid_tickers)}
+                })
+        except:
+            pass
+            
+    # Include the special points in the frontier list if not close
+    # Actually, returning them separately is better for UI highlighting.
+    
+    return {
+        "frontier": frontier_points,
+        "max_sharpe": max_sharpe_point,
+        "min_vol": min_vol_point,
+        # Legacy support: also return all points as a single list for simple scatter if needed
+        "simulation": frontier_points # Backward compatibility key
+    }
 
-        # Portfolio Volatility
-        # var = w.T * Cov * w
-        port_variance = np.dot(weights.T, np.dot(cov_matrix, weights))
-        port_volatility = np.sqrt(port_variance) * np.sqrt(252)
-
-        # Record
-        weight_dict = {ticker: round(weight, 4) for ticker, weight in zip(valid_tickers, weights)}
-        
-        results.append({
-            "return": round(port_return, 4),
-            "risk": round(port_volatility, 4),
-            "sharpe": round(port_return / port_volatility, 4) if port_volatility > 0 else 0,
-            "weights": weight_dict
-        })
-
-    return results
+# Legacy wrapper if needed, or we can replace the old function entirely.
+# The user wants enhancement, so replacing logic is fine.
+def simulate_multi_asset_monte_carlo(tickers: List[str], n_simulations=2000):
+   """Redirects to optimized version for better results."""
+   return simulate_multi_asset_optimized(tickers)
 
 def get_dividend_stats(tickers: List[str]):
     """
@@ -688,8 +786,21 @@ def get_stock_details(ticker: str):
     Fetches detailed info for Dashboard.
     """
     try:
+        print(f"[DEBUG] Fetching details for {ticker}...")
         t = yf.Ticker(ticker)
-        info = t.info
+        
+        # Check info explicitly
+        try:
+             info = t.info
+        except Exception as e:
+             print(f"[WARN] t.info failed for {ticker}: {e}")
+             info = {}
+             
+        if info is None: 
+            print(f"[WARN] t.info is None for {ticker}")
+            info = {}
+
+        print(f"[DEBUG] Info keys: {list(info.keys())[:5]}")
         
         # 1. Basic Info
         details = {
@@ -707,59 +818,90 @@ def get_stock_details(ticker: str):
             "description": info.get("longBusinessSummary", ""),
             "beta": info.get("beta", "N/A"),
         }
+        print("[DEBUG] Basic info constructed.")
         
         # 2. Dividend Growth
-        divs = t.dividends
-        growth = {
-            "cagr_3y": 0,
-            "cagr_5y": 0,
-            "cagr_10y": 0,
-            "years_growth": 0
-        }
-        
-        if not divs.empty:
-            growth["cagr_3y"] = round(calculate_growth_rate(divs, 3) * 100, 2)
-            growth["cagr_5y"] = round(calculate_growth_rate(divs, 5) * 100, 2)
-            growth["cagr_10y"] = round(calculate_growth_rate(divs, 10) * 100, 2)
+        try:
+            print("[DEBUG] Fetching dividends...")
+            divs = t.dividends
+            growth = {
+                "cagr_3y": 0,
+                "cagr_5y": 0,
+                "cagr_10y": 0,
+                "years_growth": 0
+            }
             
-            # Simple streak calc (consecutive years of increase)
-            annual = divs.groupby(divs.index.year).sum()
-            streak = 0
-            if len(annual) > 1:
-                vals = annual.values
-                # Iterate backwards
-                current_peak = vals[-1] 
-                # Strict: must be strictly greater than prev. Or >=? usually >=.
-                # Actually streak is defined as consecutive increases.
-                for i in range(len(vals)-1, 0, -1):
-                    if vals[i] >= vals[i-1]:
-                        streak += 1
-                    else:
-                        break
-            growth["years_growth"] = streak
-            
-        details["dividend_growth"] = growth
-        details["dividend_history"] = [{"year": y, "amount": round(v, 4)} for y, v in divs.groupby(divs.index.year).sum().items()]
-        
+            # Defensive check: ensure divs is a Series/DataFrame and not empty
+            if divs is not None and not divs.empty:
+                print(f"[DEBUG] Divs found: {len(divs)}")
+                growth["cagr_3y"] = round(calculate_growth_rate(divs, 3) * 100, 2)
+                growth["cagr_5y"] = round(calculate_growth_rate(divs, 5) * 100, 2)
+                growth["cagr_10y"] = round(calculate_growth_rate(divs, 10) * 100, 2)
+                
+                # Simple streak calc
+                # Group by year
+                annual = divs.groupby(divs.index.year).sum()
+                if annual is not None and len(annual) > 1: # Check annual validity
+                    streak = 0
+                    vals = annual.values
+                    for i in range(len(vals)-1, 0, -1):
+                        if vals[i] >= vals[i-1]:
+                            streak += 1
+                        else:
+                            break
+                    growth["years_growth"] = streak
+                
+                details["dividend_growth"] = growth
+                
+                # Safe iteration for history
+                # Check if annual is safe
+                if annual is not None:
+                    details["dividend_history"] = [{"year": y, "amount": round(v, 4)} for y, v in annual.items()]
+                else:
+                    details["dividend_history"] = []
+            else:
+                print("[DEBUG] Divs empty or None.")
+                details["dividend_growth"] = growth
+                details["dividend_history"] = []
+                
+        except Exception as e:
+            print(f"[WARN] Div Error: {e}")
+            import traceback
+            traceback.print_exc()
+            details["dividend_growth"] = growth
+            details["dividend_history"] = []
+
         # 3. Financials (Stocks)
-        # Revenue/Net Income Trajectory
+        print("[DEBUG] Fetching financials...")
         financials_data = []
         try:
             fin = t.financials
-            if not fin.empty:
-                 # Columns are dates.
+            # Check if fin is valid
+            if fin is not None and not fin.empty:
+                 print(f"[DEBUG] Financials shape: {fin.shape}")
                  dates = fin.columns
-                 for d in dates:
-                     rev = fin.loc['Total Revenue'][d] if 'Total Revenue' in fin.index else 0
-                     income = fin.loc['Net Income'][d] if 'Net Income' in fin.index else 0
-                     financials_data.append({
-                         "date": d.strftime("%Y-%m-%d"),
-                         "revenue": rev,
-                         "net_income": income
-                     })
-                 # Sort charts
-                 financials_data.sort(key=lambda x: x['date'])
-        except:
+                 if dates is not None: # Ensure dates is iterable
+                     for d in dates:
+                         rev = 0
+                         if fin.index is not None and 'Total Revenue' in fin.index:
+                             rev = fin.loc['Total Revenue'][d]
+                         
+                         income = 0
+                         if fin.index is not None and 'Net Income' in fin.index:
+                             income = fin.loc['Net Income'][d]
+
+                         financials_data.append({
+                             "date": d.strftime("%Y-%m-%d"),
+                             "revenue": rev,
+                             "net_income": income
+                         })
+                     financials_data.sort(key=lambda x: x['date'])
+            else:
+                 print("[DEBUG] Financials empty or None.")
+        except Exception as e:
+             print(f"[WARN] Fin Error: {e}") 
+             import traceback
+             traceback.print_exc()
              pass
         details["financials"] = financials_data
         
@@ -767,10 +909,13 @@ def get_stock_details(ticker: str):
         # Often in 'sectorWeightings' or just return N/A
         details["sector_weights"] = [] # Placeholder, hard to get from basic yfinance without funds_data
         
+        print("[DEBUG] Cleaning NaNs...")
         return clean_nans(details)
         
     except Exception as e:
-        print(f"Detail Fetch Error {ticker}: {e}")
+        print(f"[ERROR] Detail Fetch CRASH {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
@@ -798,9 +943,89 @@ def calculate_mfi(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.
     positive_mf = positive_flow.rolling(window=period, min_periods=period).sum()
     negative_mf = negative_flow.rolling(window=period, min_periods=period).sum()
     
-    mfi_ratio = positive_mf / negative_mf
-    mfi = 100 - (100 / (1 + mfi_ratio))
+    # Avoid division by zero
+    mfi = 100 - (100 / (1 + (positive_mf / negative_mf)))
+    mfi = mfi.fillna(50) # Neutral if undefined
     return mfi
+
+def search_ticker(query: str):
+    """
+    Searches for tickers using Yahoo Finance Autocomplete API.
+    Supports English and Korean queries.
+    """
+    # Detect Korean characters to optimize search params
+    def has_korean(text):
+        for char in text:
+            if '\uac00' <= char <= '\ud7a3':
+                return True
+        return False
+
+    is_korean = has_korean(query)
+    
+    # Primary Search (Customized for Language)
+    # Note: 'region=KR' often causes 400 Errors. Using 'region=US' with 'lang=ko-KR' is safer 
+    # and still finds Korean stocks (e.g., searches for '삼성' return '005930.KS').
+    url = "https://query2.finance.yahoo.com/v1/finance/search"
+    params = {
+        "q": query,
+        "quotesCount": 10,
+        "newsCount": 0,
+        "enableFuzzyQuery": "false",
+        "enableXray": "true",
+        "enableCtl": "true",
+        "enableStxCategories": "true",
+        "region": "US",  # Changed from KR to US to avoid 400 Bad Request
+        "lang": "ko-KR" if is_korean else "en-US" 
+    }
+    
+    # User-Agent is required for Yahoo API
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    def fetch_search(search_params):
+        try:
+             print(f"[DEBUG] Searching for: {search_params['q']} (Region: {search_params.get('region')})")
+             response = requests.get(url, params=search_params, headers=headers, timeout=5)
+             
+             if response.status_code != 200:
+                 print(f"[ERROR] Search API failed: {response.status_code}")
+                 return None
+                 
+             data = response.json()
+             if "quotes" not in data:
+                 return []
+                 
+             results = []
+             for quote in data["quotes"]:
+                 if quote.get("quoteType") not in ["EQUITY", "ETF", "MUTUALFUND"]:
+                     continue
+                 
+                 results.append({
+                     "symbol": quote.get("symbol"),
+                     "name": quote.get("shortname") or quote.get("longname"),
+                     "exchDisp": quote.get("exchDisp"),
+                     "typeDisp": quote.get("typeDisp"),
+                     "exchange": quote.get("exchange")
+                 })
+             return results
+        except Exception as e:
+            print(f"[ERROR] Search Exception: {e}")
+            return None
+
+    # Attempt 1
+    results = fetch_search(params)
+    
+    # Fallback attempt (If failed or empty, and query was Korean)
+    # Retry with standard defaults if customized request failed
+    if results is None and is_korean:
+        print("[DEBUG] Retrying search with default US/English parameters...")
+        fallback_params = params.copy()
+        fallback_params["lang"] = "en-US"
+        fallback_params["region"] = "US"
+        results = fetch_search(fallback_params)
+        
+    return results or []
 
 def calculate_bollinger_bands(series: pd.Series, period: int = 20, std_dev: int = 2):
     """Calculates Bollinger Bands (Middle, Upper, Lower)."""

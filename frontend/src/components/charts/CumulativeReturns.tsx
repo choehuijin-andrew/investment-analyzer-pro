@@ -79,7 +79,7 @@ const CumulativeReturns: React.FC<CumulativeReturnsProps> = ({ dataTR, dataPR })
 
     return (
         <div
-            className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm h-[400px] flex flex-col"
+            className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm h-full flex flex-col"
             onWheel={handleWheel}
         >
             <div className="flex justify-between items-center mb-4 shrink-0">
